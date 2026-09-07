@@ -6,7 +6,7 @@ import { Application, Graphics, Text } from "pixi.js";
   await app.init({
     width: 960,
     height: 720,
-    background: "#1099bb",
+    background: "#000000",
     antialias: true,
   });
   document.getElementById("pixi-container").appendChild(app.canvas);
@@ -17,12 +17,18 @@ import { Application, Graphics, Text } from "pixi.js";
   const paddleBottomOffset = 70;
   const paddleSpeed = 480;
   const ballRadius = 10;
+  const playfieldLeft = 54;
+  const playfieldTop = 42;
+  const playfieldWidth = 650;
+  const playfieldHeight = 648;
+  const playfieldRight = playfieldLeft + playfieldWidth;
+  const playfieldBottom = playfieldTop + playfieldHeight;
   const brickRows = 5;
   const brickColumns = 8;
   const brickHeight = 28;
   const brickGap = 6;
-  const brickTopOffset = 90;
-  const brickSidePadding = 80;
+  const brickTopOffset = playfieldTop + 75;
+  const brickSidePadding = 30;
   const brickColors = [0xe94f64, 0xf79d41, 0xf7dc6f, 0x66c7a5, 0x4ea5d9];
 
   const paddle = new Graphics()
@@ -30,6 +36,18 @@ import { Application, Graphics, Text } from "pixi.js";
     .fill(0xde3249);
 
   const ball = new Graphics().circle(0, 0, ballRadius).fill(0xffffff);
+  const playfieldBackground = new Graphics()
+    .rect(playfieldLeft, playfieldTop, playfieldWidth, playfieldHeight)
+    .fill(0x0b3e18);
+  const frame = new Graphics()
+    .roundRect(playfieldLeft - 18, playfieldTop - 24, playfieldWidth + 36, 20, 4)
+    .fill(0xd6ded9)
+    .rect(playfieldLeft - 18, playfieldTop - 4, 18, playfieldHeight + 18)
+    .fill(0xd6ded9)
+    .rect(playfieldRight, playfieldTop - 4, 18, playfieldHeight + 18)
+    .fill(0xd6ded9)
+    .rect(playfieldLeft - 3, playfieldTop - 5, playfieldWidth + 6, 5)
+    .fill(0x52605a);
   const scoreText = new Text({
     text: "SCORE: 0",
     style: {
@@ -39,7 +57,7 @@ import { Application, Graphics, Text } from "pixi.js";
       fontWeight: "bold",
     },
   });
-  scoreText.position.set(24, 24);
+  scoreText.position.set(playfieldRight + 38, 110);
 
   const livesText = new Text({
     text: "LIVES: 3",
@@ -50,8 +68,7 @@ import { Application, Graphics, Text } from "pixi.js";
       fontWeight: "bold",
     },
   });
-  livesText.anchor.set(1, 0);
-  livesText.position.set(app.screen.width - 24, 24);
+  livesText.position.set(playfieldRight + 38, 150);
 
   const endOverlay = new Graphics()
     .rect(0, 0, app.screen.width, app.screen.height)
@@ -70,7 +87,7 @@ import { Application, Graphics, Text } from "pixi.js";
     },
   });
   winText.anchor.set(0.5);
-  winText.position.set(app.screen.width / 2, app.screen.height / 2);
+  winText.position.set(playfieldLeft + playfieldWidth / 2, playfieldTop + playfieldHeight / 2);
   winText.visible = false;
 
   const gameOverText = new Text({
@@ -85,7 +102,7 @@ import { Application, Graphics, Text } from "pixi.js";
     },
   });
   gameOverText.anchor.set(0.5);
-  gameOverText.position.set(app.screen.width / 2, app.screen.height / 2);
+  gameOverText.position.set(playfieldLeft + playfieldWidth / 2, playfieldTop + playfieldHeight / 2);
   gameOverText.visible = false;
 
   const keys = {};
@@ -103,14 +120,14 @@ import { Application, Graphics, Text } from "pixi.js";
   };
 
   const placePaddle = () => {
-    paddle.x = (app.screen.width - paddle.width) / 2;
-    paddle.y = app.screen.height - paddleBottomOffset;
+    paddle.x = playfieldLeft + (playfieldWidth - paddle.width) / 2;
+    paddle.y = playfieldBottom - paddleBottomOffset;
     putBallOnPaddle();
   };
 
   const createBricks = () => {
     const brickWidth =
-      (app.screen.width - brickSidePadding * 2 - brickGap * (brickColumns - 1)) /
+      (playfieldWidth - brickSidePadding * 2 - brickGap * (brickColumns - 1)) /
       brickColumns;
 
     for (let row = 0; row < brickRows; row += 1) {
@@ -119,13 +136,39 @@ import { Application, Graphics, Text } from "pixi.js";
           .roundRect(0, 0, brickWidth, brickHeight, 5)
           .fill(brickColors[row]);
 
-        brick.x = brickSidePadding + column * (brickWidth + brickGap);
+        brick.x = playfieldLeft + brickSidePadding + column * (brickWidth + brickGap);
         brick.y = brickTopOffset + row * (brickHeight + brickGap);
 
         bricks.push(brick);
         app.stage.addChild(brick);
       }
     }
+  };
+
+  const createWallDetail = (x, y, width, height) => {
+    const wallDetail = new Graphics()
+      .roundRect(0, 0, width, height, 3)
+      .fill(0xcfd7d1)
+      .rect(0, 7, width, 4)
+      .fill(0x53605a)
+      .rect(0, 15, width, 4)
+      .fill(0x53605a)
+      .rect(0, height - 11, width, 4)
+      .fill(0xffffff);
+
+    wallDetail.position.set(x, y);
+    app.stage.addChild(wallDetail);
+  };
+
+  const createWallDetails = () => {
+    const wallBlockHeight = 52;
+    const wallBlockWidth = 18;
+    const rows = [playfieldTop + 115, playfieldTop + 280, playfieldTop + 445];
+
+    rows.forEach((y) => {
+      createWallDetail(playfieldLeft - wallBlockWidth, y, wallBlockWidth, wallBlockHeight);
+      createWallDetail(playfieldRight, y, wallBlockWidth, wallBlockHeight);
+    });
   };
 
   const removeAllBricks = () => {
@@ -202,6 +245,8 @@ import { Application, Graphics, Text } from "pixi.js";
     keys[event.code] = false;
   });
 
+  app.stage.addChild(playfieldBackground, frame);
+  createWallDetails();
   app.stage.addChild(paddle, ball);
   placePaddle();
   createBricks();
@@ -221,7 +266,7 @@ import { Application, Graphics, Text } from "pixi.js";
       paddle.x += paddleSpeed * deltaSeconds;
     }
 
-    paddle.x = Math.max(0, Math.min(paddle.x, app.screen.width - paddle.width));
+    paddle.x = Math.max(playfieldLeft, Math.min(paddle.x, playfieldRight - paddle.width));
 
     if (!isLaunched) {
       putBallOnPaddle();
@@ -231,16 +276,16 @@ import { Application, Graphics, Text } from "pixi.js";
     ball.x += ballVelocity.x * deltaSeconds;
     ball.y += ballVelocity.y * deltaSeconds;
 
-    if (ball.x - ballRadius <= 0) {
-      ball.x = ballRadius;
+    if (ball.x - ballRadius <= playfieldLeft) {
+      ball.x = playfieldLeft + ballRadius;
       ballVelocity.x = Math.abs(ballVelocity.x);
     }
-    if (ball.x + ballRadius >= app.screen.width) {
-      ball.x = app.screen.width - ballRadius;
+    if (ball.x + ballRadius >= playfieldRight) {
+      ball.x = playfieldRight - ballRadius;
       ballVelocity.x = -Math.abs(ballVelocity.x);
     }
-    if (ball.y - ballRadius <= 0) {
-      ball.y = ballRadius;
+    if (ball.y - ballRadius <= playfieldTop) {
+      ball.y = playfieldTop + ballRadius;
       ballVelocity.y = Math.abs(ballVelocity.y);
     }
 
@@ -305,7 +350,7 @@ import { Application, Graphics, Text } from "pixi.js";
       ballVelocity.y = -ballSpeed * Math.cos(bounceAngle);
     }
 
-    if (ball.y - ballRadius > app.screen.height) {
+    if (ball.y - ballRadius > playfieldBottom) {
       lives -= 1;
       livesText.text = `LIVES: ${lives}`;
 
