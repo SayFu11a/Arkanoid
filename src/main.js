@@ -1,98 +1,112 @@
-import { Application, Assets, Sprite, Container, Graphics } from "pixi.js";
+import { Application, Graphics } from "pixi.js";
 
 (async () => {
-  // Create a new application
   const app = new Application();
 
-  // Initialize the application
   await app.init({ background: "#1099bb", resizeTo: window });
-
-  // Append the application canvas to the document body
   document.getElementById("pixi-container").appendChild(app.canvas);
 
-  // Load the bunny texture
-  const texture = await Assets.load("/assets/bunny.png");
+  const paddleWidth = 140;
+  const paddleHeight = 24;
+  const paddleBottomOffset = 70;
+  const paddleSpeed = 480;
+  const ballRadius = 10;
 
+  const paddle = new Graphics()
+    .roundRect(0, 0, paddleWidth, paddleHeight, 8)
+    .fill(0xde3249);
 
+  const ball = new Graphics().circle(0, 0, ballRadius).fill(0xffffff);
 
-  // Create a bunny Sprite
-  const bunny = new Sprite(texture);
-
-  // Center the sprite's anchor point
-  bunny.anchor.set(0.5);
-
-  // Create and add a container to the stage
-  const container = new Container();
-
-  app.stage.addChild(container);
-
-
-  // Move the sprite to the center of the screen
-  bunny.position.set(app.screen.width / 2, app.screen.height / 2);
-
-  // Add the bunny to the stage
-
-  app.stage.addChild(bunny);
-
-   // Create a 5x5 grid of bunnies in the container
-  for (let i = 0; i < 25; i++) {
-    const bunny = new Sprite(texture);
-
-    bunny.x = (i % 5) * 40;
-    bunny.y = Math.floor(i / 5) * 40;
-    container.addChild(bunny);
-  }
-
-  
-
-  // Move the container to the center
-  container.x = app.screen.width / 2
-  container.y = app.screen.height / 2;
-
-
-
-
-  const rectangle = new Graphics().rect(0, 0, 100, 100).fill(0xDE3249);
-  // Установим начальную позицию
-  rectangle.x = 100;
-  rectangle.y = 100;
-  app.stage.addChild(rectangle);
-
-  // 2. Объект для отслеживания нажатых клавиш
   const keys = {};
+  const ballVelocity = { x: 260, y: -360 };
+  let isLaunched = false;
 
-  window.addEventListener('keydown', (e) => {
-      keys[e.code] = true;
+  const putBallOnPaddle = () => {
+    ball.x = paddle.x + paddle.width / 2;
+    ball.y = paddle.y - ballRadius;
+  };
+
+  const placePaddle = () => {
+    paddle.x = (app.screen.width - paddle.width) / 2;
+    paddle.y = app.screen.height - paddleBottomOffset;
+    putBallOnPaddle();
+  };
+
+  window.addEventListener("keydown", (event) => {
+    keys[event.code] = true;
+
+    if (event.code === "Space" && !isLaunched) {
+      event.preventDefault();
+      isLaunched = true;
+    }
   });
 
-  window.addEventListener('keyup', (e) => {
-      keys[e.code] = false;
+  window.addEventListener("keyup", (event) => {
+    keys[event.code] = false;
   });
 
-  // 3. Скорость движения (пикселей за кадр)
-  const speed = 5;
+  app.stage.addChild(paddle, ball);
+  placePaddle();
 
-  // 4. Главный игровой цикл обновления позиции
-  app.ticker.add(() => {
-      if (keys['ArrowUp'] || keys['KeyW']) {
-          rectangle.y -= speed;
-      }
-      if (keys['ArrowDown'] || keys['KeyS']) {
-          rectangle.y += speed;
-      }
-      if (keys['ArrowLeft'] || keys['KeyA']) {
-          rectangle.x -= speed;
-      }
-      if (keys['ArrowRight'] || keys['KeyD']) {
-          rectangle.x += speed;
-      }
+  app.renderer.on("resize", () => {
+    paddle.y = app.screen.height - paddleBottomOffset;
+    paddle.x = Math.min(paddle.x, app.screen.width - paddle.width);
+
+    if (!isLaunched) {
+      putBallOnPaddle();
+    }
   });
 
-  // Listen for animate update
-  app.ticker.add((time) => {
-    // Just for fun, let's rotate mr rabbit a little.
-    // * Delta is 1 if running at 100% performance *
-    // * Creates frame-independent transformation *
-    bunny.rotation += 0.1 * time.deltaTime;
+  app.ticker.add((ticker) => {
+    const deltaSeconds = ticker.deltaMS / 1000;
+
+    if (keys.ArrowLeft || keys.KeyA) {
+      paddle.x -= paddleSpeed * deltaSeconds;
+    }
+    if (keys.ArrowRight || keys.KeyD) {
+      paddle.x += paddleSpeed * deltaSeconds;
+    }
+
+    paddle.x = Math.max(0, Math.min(paddle.x, app.screen.width - paddle.width));
+
+    if (!isLaunched) {
+      putBallOnPaddle();
+      return;
+    }
+
+    ball.x += ballVelocity.x * deltaSeconds;
+    ball.y += ballVelocity.y * deltaSeconds;
+
+    if (ball.x - ballRadius <= 0) {
+      ball.x = ballRadius;
+      ballVelocity.x = Math.abs(ballVelocity.x);
+    }
+    if (ball.x + ballRadius >= app.screen.width) {
+      ball.x = app.screen.width - ballRadius;
+      ballVelocity.x = -Math.abs(ballVelocity.x);
+    }
+    if (ball.y - ballRadius <= 0) {
+      ball.y = ballRadius;
+      ballVelocity.y = Math.abs(ballVelocity.y);
+    }
+
+    const hitsPaddle =
+      ballVelocity.y > 0 &&
+      ball.y + ballRadius >= paddle.y &&
+      ball.y - ballRadius <= paddle.y + paddle.height &&
+      ball.x + ballRadius >= paddle.x &&
+      ball.x - ballRadius <= paddle.x + paddle.width;
+
+    if (hitsPaddle) {
+      ball.y = paddle.y - ballRadius;
+      ballVelocity.y = -Math.abs(ballVelocity.y);
+    }
+
+    // В "Арканоиде" низ - не стена: здесь позднее будут отниматься жизни.
+    if (ball.y - ballRadius > app.screen.height) {
+      isLaunched = false;
+      putBallOnPaddle();
+    }
   });
 })();
