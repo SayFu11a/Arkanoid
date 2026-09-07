@@ -41,13 +41,25 @@ import { Application, Graphics, Text } from "pixi.js";
   });
   scoreText.position.set(24, 24);
 
-  const winOverlay = new Graphics()
+  const livesText = new Text({
+    text: "LIVES: 3",
+    style: {
+      fill: 0xffffff,
+      fontFamily: "Arial",
+      fontSize: 24,
+      fontWeight: "bold",
+    },
+  });
+  livesText.anchor.set(1, 0);
+  livesText.position.set(app.screen.width - 24, 24);
+
+  const endOverlay = new Graphics()
     .rect(0, 0, app.screen.width, app.screen.height)
     .fill({ color: 0x000000, alpha: 0.65 });
-  winOverlay.visible = false;
+  endOverlay.visible = false;
 
   const winText = new Text({
-    text: "YOU WIN!\nAll bricks destroyed",
+    text: "YOU WIN!\nAll bricks destroyed\nPress R to restart",
     style: {
       align: "center",
       fill: 0xffffff,
@@ -61,11 +73,28 @@ import { Application, Graphics, Text } from "pixi.js";
   winText.position.set(app.screen.width / 2, app.screen.height / 2);
   winText.visible = false;
 
+  const gameOverText = new Text({
+    text: "GAME OVER\nPress R to restart",
+    style: {
+      align: "center",
+      fill: 0xffffff,
+      fontFamily: "Arial",
+      fontSize: 48,
+      fontWeight: "bold",
+      lineHeight: 56,
+    },
+  });
+  gameOverText.anchor.set(0.5);
+  gameOverText.position.set(app.screen.width / 2, app.screen.height / 2);
+  gameOverText.visible = false;
+
   const keys = {};
   const bricks = [];
   const ballVelocity = { x: 260, y: -360 };
   let isLaunched = false;
   let gameWon = false;
+  let gameOver = false;
+  let lives = 3;
   let score = 0;
 
   const putBallOnPaddle = () => {
@@ -99,21 +128,56 @@ import { Application, Graphics, Text } from "pixi.js";
     }
   };
 
-  const showWinScreen = () => {
-    gameWon = true;
-    isLaunched = false;
-    winOverlay.visible = true;
-    winText.visible = true;
-  };
-
-  clearBricksButton.addEventListener("click", () => {
-    const destroyedBrickCount = bricks.length;
-
+  const removeAllBricks = () => {
     while (bricks.length > 0) {
       const brick = bricks.pop();
       app.stage.removeChild(brick);
       brick.destroy();
     }
+  };
+
+  const showWinScreen = () => {
+    gameWon = true;
+    isLaunched = false;
+    app.stage.addChild(endOverlay, winText);
+    endOverlay.visible = true;
+    winText.visible = true;
+  };
+
+  const showGameOverScreen = () => {
+    gameOver = true;
+    isLaunched = false;
+    app.stage.addChild(endOverlay, gameOverText);
+    endOverlay.visible = true;
+    gameOverText.visible = true;
+  };
+
+  const restartGame = () => {
+    removeAllBricks();
+    score = 0;
+    lives = 3;
+    gameWon = false;
+    gameOver = false;
+    isLaunched = false;
+    ballVelocity.x = 260;
+    ballVelocity.y = -360;
+    scoreText.text = "SCORE: 0";
+    livesText.text = "LIVES: 3";
+    endOverlay.visible = false;
+    winText.visible = false;
+    gameOverText.visible = false;
+    createBricks();
+    placePaddle();
+  };
+
+  clearBricksButton.addEventListener("click", () => {
+    if (gameWon || gameOver) {
+      return;
+    }
+
+    const destroyedBrickCount = bricks.length;
+
+    removeAllBricks();
 
     score += destroyedBrickCount * 10;
     scoreText.text = `SCORE: ${score}`;
@@ -123,7 +187,12 @@ import { Application, Graphics, Text } from "pixi.js";
   window.addEventListener("keydown", (event) => {
     keys[event.code] = true;
 
-    if (event.code === "Space" && !isLaunched && !gameWon) {
+    if (event.code === "KeyR" && (gameWon || gameOver)) {
+      restartGame();
+      return;
+    }
+
+    if (event.code === "Space" && !isLaunched && !gameWon && !gameOver) {
       event.preventDefault();
       isLaunched = true;
     }
@@ -136,12 +205,12 @@ import { Application, Graphics, Text } from "pixi.js";
   app.stage.addChild(paddle, ball);
   placePaddle();
   createBricks();
-  app.stage.addChild(scoreText, winOverlay, winText);
+  app.stage.addChild(scoreText, livesText, endOverlay, winText, gameOverText);
 
   app.ticker.add((ticker) => {
     const deltaSeconds = ticker.deltaMS / 1000;
 
-    if (gameWon) {
+    if (gameWon || gameOver) {
       return;
     }
 
@@ -236,10 +305,16 @@ import { Application, Graphics, Text } from "pixi.js";
       ballVelocity.y = -ballSpeed * Math.cos(bounceAngle);
     }
 
-    // В "Арканоиде" низ - не стена: здесь позднее будут отниматься жизни.
     if (ball.y - ballRadius > app.screen.height) {
-      isLaunched = false;
-      putBallOnPaddle();
+      lives -= 1;
+      livesText.text = `LIVES: ${lives}`;
+
+      if (lives === 0) {
+        showGameOverScreen();
+      } else {
+        isLaunched = false;
+        putBallOnPaddle();
+      }
     }
   });
 })();
